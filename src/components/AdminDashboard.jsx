@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, ShoppingBag, Plus, Edit, Trash2, CheckCircle2, Clock, 
-  XCircle, MessageCircle, AlertCircle, RefreshCw, Filter, Layers 
+  XCircle, MessageCircle, AlertCircle, RefreshCw, Filter, Layers, Database, KeyRound, X
 } from 'lucide-react';
 import { 
   fetchAppointments, updateAppointmentStatus, fetchItems, deleteItem, 
   formatCurrency, getWhatsAppUrl, BUSINESS_CONFIG 
 } from '../services/api';
+import { isSupabaseConfigured } from '../services/supabase';
 import ItemFormModal from './ItemFormModal';
 
 export default function AdminDashboard({ onLogout }) {
@@ -24,6 +25,23 @@ export default function AdminDashboard({ onLogout }) {
   const [catalogFilter, setCatalogFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState(null);
+
+  // Estados para Configuración de Supabase
+  const [supabaseConnected, setSupabaseConnected] = useState(isSupabaseConfigured());
+  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(localStorage.getItem('ni_supabase_url') || '');
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(localStorage.getItem('ni_supabase_key') || '');
+
+  const handleSaveSupabase = (e) => {
+    e.preventDefault();
+    if (supabaseUrlInput && supabaseKeyInput) {
+      localStorage.setItem('ni_supabase_url', supabaseUrlInput.trim());
+      localStorage.setItem('ni_supabase_key', supabaseKeyInput.trim());
+      setSupabaseConnected(true);
+      setSupabaseModalOpen(false);
+      window.location.reload();
+    }
+  };
 
   // Cargar Citas
   const loadAppointments = async () => {
@@ -110,8 +128,20 @@ export default function AdminDashboard({ onLogout }) {
             </p>
           </div>
 
-          {/* Métricas rápidas y Salir */}
+          {/* Métricas rápidas, Supabase y Salir */}
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setSupabaseModalOpen(true)}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition-all ${
+                supabaseConnected
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>{supabaseConnected ? 'Supabase Conectado' : 'Conectar Supabase'}</span>
+            </button>
+
             <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded-2xl text-center">
               <span className="text-lg font-bold text-amber-700 block">{pendingCount}</span>
               <span className="text-[10px] uppercase font-bold text-amber-600">Por Confirmar</span>
@@ -461,6 +491,78 @@ export default function AdminDashboard({ onLogout }) {
           itemToEdit={itemToEdit}
           onSaved={loadCatalog}
         />
+
+        {/* Modal de Configuración Rápida de Supabase */}
+        {supabaseModalOpen && (
+          <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-stone-200 overflow-hidden">
+              <div className="bg-stone-900 px-6 py-4 text-white flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <h3 className="font-serif font-bold text-sm">Conexión a Supabase (PostgreSQL)</h3>
+                </div>
+                <button
+                  onClick={() => setSupabaseModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveSupabase} className="p-6 space-y-4 text-xs">
+                <p className="text-stone-600 leading-relaxed">
+                  Conecta tu proyecto de Supabase para que las citas, precios y stock se guarden en la nube en tiempo real sin costo.
+                </p>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Project URL (VITE_SUPABASE_URL)</label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://xxxxxxxx.supabase.co"
+                    value={supabaseUrlInput}
+                    onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-stone-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Anon / Public Key (VITE_SUPABASE_ANON_KEY)</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                    value={supabaseKeyInput}
+                    onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-stone-900"
+                  />
+                </div>
+
+                <div className="pt-2 flex justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem('ni_supabase_url');
+                      localStorage.removeItem('ni_supabase_key');
+                      setSupabaseConnected(false);
+                      setSupabaseModalOpen(false);
+                      window.location.reload();
+                    }}
+                    className="px-3 py-2 text-stone-500 hover:text-red-600 font-medium"
+                  >
+                    Desconectar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl shadow-sm"
+                  >
+                    Guardar y Conectar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
